@@ -18,6 +18,7 @@
   var target = 14;
   var complete = false;
   var frame = 0;
+  var reducedMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   function paint() {
     var rounded = Math.max(0, Math.min(100, Math.round(value)));
@@ -52,12 +53,17 @@
         value = 100;
         paint();
         boot.classList.add("ready");
-        setTimeout(function () { boot.classList.add("departing"); }, 180);
-        setTimeout(function () {
+        function removeBoot() {
+          if (boot.hidden) return;
           boot.hidden = true;
           boot.setAttribute("aria-hidden", "true");
           document.documentElement.classList.remove("booting");
-        }, 860);
+        }
+        boot.addEventListener("transitionend", function (event) {
+          if (event.target === boot && event.propertyName === "transform") removeBoot();
+        }, { once: true });
+        setTimeout(function () { boot.classList.add("departing"); }, reducedMotion ? 0 : 180);
+        setTimeout(removeBoot, reducedMotion ? 40 : 1100);
       }
       requestAnimationFrame(fill);
     }, wait);

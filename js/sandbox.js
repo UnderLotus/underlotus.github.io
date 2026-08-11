@@ -82,8 +82,9 @@
   controls.maxDistance = 150;
   controls.minPolarAngle = 0.30;
   controls.maxPolarAngle = 1.05;   /* 避免水平掠射 → 全白 */
-  controls.autoRotate = !RM && !DEBUG;   /* debug 下固定鏡頭方便驗證 */
-  controls.autoRotateSpeed = 0.25;
+  /* 自行用 elapsed time 驅動待機環繞，避免 OrbitControls 的逐幀步進在
+     Firefox／降幀時慢到近乎靜止。debug 與減少動態模式維持固定鏡頭。 */
+  controls.autoRotate = false;
 
   var labelRenderer = new THREE.CSS2DRenderer();
   labelRenderer.setSize(container.clientWidth, container.clientHeight);
@@ -410,41 +411,71 @@
     group.add(p);
   }
 
-  /* ---- PRJ-001 檔案塔：沙丘基座 + 丘頂方碑群 ---- */
-  function buildArchiveTower(p) {
+  /* ---- PRJ-001 收藏圖書館：寬版館舍 + 閱讀廊柱 + 屋頂展開的收藏冊 ---- */
+  function buildCollectionLibrary(p) {
     var g = new THREE.Group();
     var bh = Terrain.ready() ? Terrain.height(p.landmark.pos[0], p.landmark.pos[1]) : 0;
     g.position.set(p.landmark.pos[0], bh, p.landmark.pos[1]);
     g.scale.setScalar(p.landmark.scale || 1);
 
     var mats = [
-      vxMat(0xD8DDD9),   /* 0 沙丘（比平沙深一階，讀得出地形） */
-      vxMat(0xC3CAC6),   /* 1 基座 */
-      vxMat(0xD0D6D2),   /* 2 深 */
-      vxMat(0xE2E6E2),   /* 3 中 */
-      vxMat(0xEEF1EE)    /* 4 亮 */
+      vxMat(0xD8DDD9),   /* 0 沙丘 */
+      vxMat(0xBEC6C1),   /* 1 基座／書脊 */
+      vxMat(0xCCD3CF),   /* 2 館舍深部 */
+      vxMat(0xE0E5E1),   /* 3 立面 */
+      vxMat(0xEFF2EF)    /* 4 紙頁／屋頂 */
     ];
     var b = [];
-    sandMound(b, 0, 0, 10, 11, 0);               /* 沙丘：11 層階梯金字塔 */
-    b.push([-4, 11, -4, 8, 1, 8, 1]);            /* 基座平台 */
-    b.push([-3, 12, -3, 6, 1, 6, 2]);            /* 階梯 */
-    b.push([-1.5, 13, -1.5, 3, 14, 3, 4]);       /* 高塔 y13..27 */
-    b.push([-3, 16, -3, 6, 1, 6, 2]);            /* 樓層帶 1 */
-    b.push([-3, 22, -3, 6, 1, 6, 2]);            /* 樓層帶 2 */
-    b.push([-1, 27, -1, 2, 1, 2, 4]);            /* 平頂 */
-    b.push([-0.5, 28, -0.5, 1, 4, 1, 4]);        /* 細尖頂 */
-    b.push([2.5, 13, -1, 2, 9, 2, 3]);           /* 側碑（乾淨方碑） */
-    b.push([2.5, 22, -1, 3, 1, 2, 2]);           /* 側碑層帶 */
+    sandMound(b, 0, 0, 10, 3, 0);                /* 三層寬緩地坪，不形成金字塔底座 */
+    b.push([-9, 3, -6, 18, 1, 12, 1]);           /* 館前平台 */
+    b.push([-8, 4, -5, 16, 1, 10, 2]);           /* 第一階 */
+    b.push([-7, 5, -4, 5, 6, 8, 3]);             /* 左館翼 */
+    b.push([2, 5, -4, 5, 6, 8, 3]);              /* 右館翼 */
+    b.push([-2, 5, -4, 4, 6, 4, 2]);             /* 中央書庫，入口保持凹入 */
+    b.push([-8, 11, -5, 16, 1, 10, 1]);          /* 深色屋簷線 */
+
+    /* 正面閱讀廊：規律柱列是遠景下最直覺的「公共館舍」輪廓。 */
+    [-6, -3, 2, 5].forEach(function (x) {
+      b.push([x, 5, 4, 1, 5, 1, 4]);
+    });
+    b.push([-7, 10, 3, 14, 1, 2, 4]);             /* 門廊上蓋 */
+    b.push([-3, 5, 3, 2, 3, 1, 1]);              /* 左側卡片目錄櫃 */
+    b.push([1, 5, 3, 2, 3, 1, 1]);               /* 右側卡片目錄櫃 */
+
+    /* 屋頂俯視是一冊攤開的收藏簿；仍完全由同尺寸砂粒方塊堆出。 */
+    b.push([-7, 12, -3, 6, 1, 7, 4]);
+    b.push([1, 12, -3, 6, 1, 7, 4]);
+    b.push([-1, 12, -4, 2, 2, 9, 1]);
+    b.push([-6, 13, -2, 4, 1, 1, 3]);
+    b.push([2, 13, -2, 4, 1, 1, 3]);
+    b.push([-6, 13, 1, 3, 1, 1, 3]);
+    b.push([3, 13, 1, 3, 1, 1, 3]);
+
+    /* 稀疏書架背牆：用真正的空格分開橫板與書脊，避免糊成實心量體。 */
+    b.push([-7, 12, -5, 1, 9, 1, 1]);
+    b.push([6, 12, -5, 1, 9, 1, 1]);
+    b.push([-7, 12, -5, 14, 1, 1, 1]);
+    b.push([-7, 16, -5, 14, 1, 1, 1]);
+    b.push([-7, 20, -5, 14, 1, 1, 1]);
+    b.push([-5, 13, -5, 1, 3, 1, 3]);
+    b.push([-3, 13, -5, 2, 3, 1, 4]);
+    b.push([1, 13, -5, 1, 2, 1, 3]);
+    b.push([3, 13, -5, 2, 3, 1, 4]);
+    b.push([-5, 17, -5, 2, 3, 1, 4]);
+    b.push([-2, 17, -5, 1, 2, 1, 3]);
+    b.push([1, 17, -5, 2, 3, 1, 4]);
+    b.push([4, 17, -5, 1, 2, 1, 3]);
+
     g.add(voxelModel(b, mats));
-    markerPylon(g, 11.5, 11.5);
+    markerPylon(g, 11.5, 10.5);
 
     var L = registerLandmark(p, g, { baseY: bh });
-    L.label = makeLabel(p, 19.6);
+    L.label = makeLabel(p, 15.6);
     g.add(L.label);
     return L;
   }
 
-  /* ---- PRJ-002 訊號塔：沙丘 + 機房 + 高桅 + 雷達平台 + Beacon ---- */
+  /* ---- PRJ-002 訊號塔：設備站 + 分節桅塔 + 八角衛星碟 + Beacon ---- */
   function buildSignalTower(p) {
     var g = new THREE.Group();
     var bh = Terrain.ready() ? Terrain.height(p.landmark.pos[0], p.landmark.pos[1]) : 0;
@@ -460,14 +491,31 @@
     ];
     var b = [];
     sandMound(b, 0, 0, 8, 8, 0);                 /* 沙丘：8 層 */
-    b.push([-3, 7, -3, 6, 1, 6, 1]);             /* 基座板 */
-    b.push([-2, 8, -2, 4, 2, 4, 3]);             /* 機房 */
-    b.push([-1.5, 10, -1.5, 1, 1, 1, 2]);        /* 煙囪 */
-    b.push([0, 10, 0, 1, 20, 1, 4]);             /* 主桅 y10..30 */
-    b.push([-1.5, 16, 0, 4, 1, 1, 2]);           /* 斜撐 y16 */
-    b.push([-1.5, 23, 0, 4, 1, 1, 2]);           /* 斜撐 y23 */
-    b.push([-2, 30, -2, 4, 1, 4, 3]);            /* 雷達平台 */
-    b.push([-1, 31, -1, 2, 1, 2, 3]);
+    b.push([-4, 7, -4, 8, 1, 8, 1]);             /* 站體基座 */
+    b.push([-3, 8, -3, 5, 4, 5, 3]);             /* 設備機房 */
+    b.push([2, 8, -2, 2, 2, 3, 2]);              /* 外接電力櫃 */
+    b.push([-2, 12, -2, 1, 6, 1, 2]);            /* 下層四腳 */
+    b.push([1, 12, -2, 1, 6, 1, 2]);
+    b.push([-2, 12, 1, 1, 6, 1, 2]);
+    b.push([1, 12, 1, 1, 6, 1, 2]);
+    b.push([-3, 17, -3, 6, 1, 6, 1]);            /* 維修平台 1 */
+    b.push([-1, 18, -1, 1, 7, 1, 4]);            /* 中層雙桅 */
+    b.push([0, 18, 0, 1, 7, 1, 4]);
+    b.push([-2, 24, -2, 4, 1, 4, 1]);            /* 維修平台 2 */
+    b.push([-0.5, 25, -0.5, 1, 12, 1, 4]);       /* 上層主桅 */
+    b.push([-4, 27, 0, 8, 1, 1, 2]);             /* 天線陣列 */
+    b.push([-3, 31, 0, 6, 1, 1, 2]);
+    b.push([-2, 34, 0, 4, 1, 1, 2]);
+
+    /* 偏置式像素訊號碟：與主桅留一格空隙，只由側向支臂銜接。 */
+    b.push([-7, 27, 1, 3, 1, 1, 4]);
+    b.push([-8, 28, 1, 5, 1, 1, 4]);
+    b.push([-9, 29, 1, 6, 3, 1, 4]);
+    b.push([-8, 32, 1, 5, 1, 1, 4]);
+    b.push([-7, 33, 1, 3, 1, 1, 4]);
+    b.push([-4, 30, 0, 4, 1, 1, 2]);             /* 支臂：碟緣 → 主桅 */
+    b.push([-6, 30, 2, 1, 1, 2, 2]);             /* 短饋源，不穿過碟面 */
+
     g.add(voxelModel(b, mats));
 
     /* Beacon：唯一的常駐金色——深色燈罩 + 高強度發光 + 加法光暈 */
@@ -479,7 +527,7 @@
     beaconMat.userData.baseColor = beaconMat.color.clone();
     beaconMat.userData.baseEmissive = beaconMat.emissive.clone();
     var beacon = new THREE.Mesh(new THREE.BoxGeometry(BLOCK * 1.25, BLOCK * 1.25, BLOCK * 1.25), beaconMat);
-    beacon.position.set(0.5 * BLOCK, 32.7 * BLOCK, 0.5 * BLOCK);
+    beacon.position.set(0, 38 * BLOCK, 0);
     beacon.castShadow = true;
     beaconMat.__mesh = beacon;
     g.add(beacon);
@@ -494,7 +542,7 @@
     markerPylon(g, 9.5, 9.5);
 
     var L = registerLandmark(p, g, { baseY: bh });
-    L.label = makeLabel(p, 22.4);
+    L.label = makeLabel(p, 25.2);
     g.add(L.label);
     return L;
   }
@@ -927,6 +975,13 @@
       camera.position.x = controls.target.x + Math.sin(a) * camTween.r;
       camera.position.z = controls.target.z + Math.cos(a) * camTween.r;
       if (k >= 1) camTween = null;
+    } else if (!RM && !DEBUG && nowMs - lastInteraction > 1200) {
+      /* 真正按秒計算的低速環繞；不受 24/30/60fps 或 Firefox rAF 節流影響。 */
+      var idleAngle = dt * 0.022;
+      var idleX = camera.position.x - controls.target.x;
+      var idleZ = camera.position.z - controls.target.z;
+      camera.position.x = controls.target.x + idleX * Math.cos(idleAngle) + idleZ * Math.sin(idleAngle);
+      camera.position.z = controls.target.z - idleX * Math.sin(idleAngle) + idleZ * Math.cos(idleAngle);
     }
 
     landmarks.forEach(function (L) {
@@ -1002,7 +1057,7 @@
           buildUnmapped();
           PROJECTS.forEach(function (p) {
             if (!p.landmark) return;
-            if (p.landmark.type === "archive-tower") buildArchiveTower(p);
+            if (p.landmark.type === "collection-library") buildCollectionLibrary(p);
             else if (p.landmark.type === "signal-tower") buildSignalTower(p);
           });
           buildFiller();

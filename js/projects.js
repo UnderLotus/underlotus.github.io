@@ -14,7 +14,7 @@
  *   status  LIVE / ACTIVE / IDLE（會決定狀態點的顏色）
  *   links   github / demo / 其他外連（沒有的欄位留空字串）
  *   landmark 地標設定：
- *     type   archive-tower（檔案塔）| signal-tower（訊號塔）| monolith（方碑）| silo（筒倉）| dome（穹頂）| kiosk（小站）
+ *     type   collection-library（收藏圖書館）| signal-tower（訊號塔）| monolith（方碑）| silo（筒倉）| dome（穹頂）| kiosk（小站）
  *     pos    座標 [x, z]（以沙盤中心為原點，地面為 y=0）
  *     scale  縮放（預設 1）
  * ============================================================ */
@@ -34,7 +34,7 @@ window.PROJECTS = [
       demo: "https://underlotus.github.io/r1999-roster/"
     },
     landmark: {
-      type: "archive-tower",
+      type: "collection-library",
       pos: [-17, 35],
       scale: 1
     }
