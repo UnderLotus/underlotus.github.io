@@ -3,23 +3,44 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>underlotus — VIBE CODER · 個人沙盤</title>
+<title>underlotus - diorama</title>
 <meta name="description" content="underlotus — 興趣使然的開發者，與 Agent 一起施展魔法，將想像化為可能。">
-<meta property="og:title" content="underlotus — VIBE CODER">
+<meta property="og:title" content="underlotus - diorama">
 <meta property="og:description" content="興趣使然的開發者，與 Agent 一起施展魔法，將想像化為可能。">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://underlotus.github.io/">
 <meta property="og:site_name" content="underlotus">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="underlotus — VIBE CODER">
+<meta name="twitter:title" content="underlotus - diorama">
 <meta name="twitter:description" content="興趣使然的開發者，與 Agent 一起施展魔法，將想像化為可能。">
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=Noto+Serif+TC:wght@500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/style.css">
+<noscript><style>#boot { display: none; }</style></noscript>
 </head>
 <body>
+
+<!-- ============ SANDBOX BOOT SEQUENCE ============ -->
+<div class="boot" id="boot" role="status" aria-live="polite" aria-atomic="true">
+  <div class="boot-corner boot-corner-tl" aria-hidden="true"></div>
+  <div class="boot-corner boot-corner-br" aria-hidden="true"></div>
+  <div class="boot-panel">
+    <p class="boot-kicker mono">SITE/01 · INITIALIZATION</p>
+    <div class="boot-heading">
+      <strong>DIORAMA</strong>
+      <span class="mono">SANDBOX SYSTEM</span>
+    </div>
+    <div class="boot-track" aria-hidden="true"><i id="boot-bar"></i></div>
+    <div class="boot-readout mono">
+      <span id="boot-status">LINKING RENDERER</span>
+      <output id="boot-value">006%</output>
+    </div>
+  </div>
+  <p class="boot-coordinate mono">N25.165 · E121.553</p>
+</div>
+<script src="js/boot.js"></script>
 
 <div class="page">
 
@@ -46,7 +67,11 @@
       </div>
       <aside class="toc mono" id="toc" aria-label="專案目錄"></aside>
       <a class="mobile-scroll-cue mono" href="#about" aria-label="前往 About 區段">
-        <span>01 / ABOUT</span><i aria-hidden="true"></i>
+        <span>01 / ABOUT</span>
+        <svg class="scroll-cue-mark" viewBox="0 0 24 32" aria-hidden="true" focusable="false">
+          <path class="cue-shaft" d="M12 2V25"></path>
+          <path class="cue-head" d="M5.5 18.5L12 25L18.5 18.5"></path>
+        </svg>
       </a>
       <div class="legend mono"><span class="lg"><i class="dot on"></i>已登錄</span><span class="lg"><i class="dot off"></i>未登錄</span></div>
       <div class="coord mono" id="coord">N25.165 · E121.553</div>

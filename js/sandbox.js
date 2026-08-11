@@ -13,7 +13,16 @@
   var container = document.getElementById("scene");
   if (!container) return;
 
-  if (!window.THREE || !webglAvailable()) { showFallback(); return; }
+  function reportBoot(value, label) {
+    document.dispatchEvent(new CustomEvent("sandbox:progress", { detail: { value: value, label: label } }));
+  }
+
+  reportBoot(24, "CHECKING WEBGL");
+  if (!window.THREE || !webglAvailable()) {
+    showFallback();
+    document.dispatchEvent(new CustomEvent("sandbox:error"));
+    return;
+  }
 
   var THREE = window.THREE;
   var DEBUG = new URLSearchParams(location.search).has("debug");
@@ -28,8 +37,9 @@
   var SAND_R = 95;   /* 沙床半徑（world）：大於最大拉遠可視範圍，無邊界 */
 
   /* ================= 渲染器 ================= */
+  var mobileRender = window.innerWidth <= 640;
   var renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: DEBUG });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));   /* 發熱控制 */
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, mobileRender ? 1.25 : 1.5));
   renderer.setSize(container.clientWidth, container.clientHeight);
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -37,6 +47,7 @@
   renderer.toneMappingExposure = 1.15;
   renderer.outputEncoding = THREE.sRGBEncoding;
   container.appendChild(renderer.domElement);
+  reportBoot(38, "RENDERER ONLINE");
 
 
 
@@ -88,7 +99,7 @@
   var sun = new THREE.DirectionalLight(0xFFFFFF, 1.1);
   sun.position.set(-30, 22, -18);
   sun.castShadow = true;
-  sun.shadow.mapSize.set(2048, 2048);
+  sun.shadow.mapSize.set(mobileRender ? 1024 : 2048, mobileRender ? 1024 : 2048);
   sun.shadow.radius = 4;
   sun.shadow.camera.left = -60;
   sun.shadow.camera.right = 60;
@@ -274,11 +285,13 @@
   var _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _e = new THREE.Euler(), _v = new THREE.Vector3(), _c = new THREE.Color();
   var _s = new THREE.Vector3(), _one = new THREE.Vector3(1, 1, 1);
   var _i = 0;
+  var terrainHeight = Terrain.ready() ? Terrain.height : syntheticHeight;
   for (var gx = -SAND_R + BLOCK / 2; gx <= SAND_R - BLOCK / 2; gx += BLOCK) {
     for (var gz = -SAND_R + BLOCK / 2; gz <= SAND_R - BLOCK / 2; gz += BLOCK) {
       var gr = Math.hypot(gx, gz);
       if (gr > SAND_R) continue;               /* 圓形沙盤 */
-      var hy = sandHeight(gx, gz);
+      var thx = terrainHeight(gx, gz);
+      var hy = thx + (cellHash(gx * 3 + 1, 5, gz * 3 + 2) - 0.5) * 0.12;
       var r1 = cellHash(gx, 1, gz), r2 = cellHash(gz, 3, gx);
       var r3 = cellHash(gz, 7, gx);
       _e.set((r1 - 0.5) * 0.10, 0, (r2 - 0.5) * 0.10);
@@ -298,15 +311,15 @@
       sandQuat[_i * 4] = _q.x; sandQuat[_i * 4 + 1] = _q.y; sandQuat[_i * 4 + 2] = _q.z; sandQuat[_i * 4 + 3] = _q.w;
       sandScale[_i] = sc;
       /* 地形法線著色：太陽（-30,22,-18 → 單位方向 -0.726,0.533,-0.436） */
-      var th = Terrain.ready() ? Terrain.height : syntheticHeight;
-      var thx = th(gx, gz);
-      var dpx = (th(gx + BLOCK, gz) - thx) / BLOCK;
-      var dpz = (th(gx, gz + BLOCK) - thx) / BLOCK;
+      var hxp = terrainHeight(gx + BLOCK, gz), hxm = terrainHeight(gx - BLOCK, gz);
+      var hzp = terrainHeight(gx, gz + BLOCK), hzm = terrainHeight(gx, gz - BLOCK);
+      var dpx = (hxp - thx) / BLOCK;
+      var dpz = (hzp - thx) / BLOCK;
       var ln = Math.hypot(-dpx, 1, -dpz);
       var ndl = ((-dpx / ln) * -0.726 + (1 / ln) * 0.533 + (-dpz / ln) * -0.436);
       var shade = 0.88 + 0.22 * Math.max(0, Math.min(1, ndl));
       /* 遮蔽 AO：被更高的鄰居包圍（谷底/縫隙）→ 變暗 */
-      var nmax = Math.max(th(gx + BLOCK, gz), th(gx - BLOCK, gz), th(gx, gz + BLOCK), th(gx, gz - BLOCK));
+      var nmax = Math.max(hxp, hxm, hzp, hzm);
       var shelter = Math.max(0, nmax - thx);
       var aoF = 1 - Math.min(0.28, shelter * 0.32);
       /* Hypsometric：低地暖灰 → 高地冷白，山脊才跳得出來 */
@@ -822,6 +835,11 @@
     lastInteraction = performance.now();
   });
   renderer.domElement.addEventListener("pointermove", function (e) {
+    /* 手機拖曳交給鏡頭／頁面手勢；避免每幀掃描整座沙床。點擊漣漪仍由 pointerup 處理。 */
+    if (e.pointerType === "touch") {
+      lastInteraction = performance.now();
+      return;
+    }
     setHover(hitTest(e));
     updateCursorGround(e);
     cursorOn = true;
@@ -866,12 +884,35 @@
   var sigSel = new THREE.Color(0xD4B23E).multiplyScalar(0.5);
   var sigHov = new THREE.Color(0xD4B23E).multiplyScalar(0.26);
   var black = new THREE.Color(0x000000);
+  var lastSandUpdate = 0;
+  var sceneVisible = true;
+  var pageScrolling = false;
+  var scrollTimer = 0;
+  var hero = container.closest(".sandbox") || container;
+
+  if ("IntersectionObserver" in window) {
+    new IntersectionObserver(function (entries) {
+      sceneVisible = !!entries[0].isIntersecting;
+      if (sceneVisible) lastInteraction = performance.now();
+    }, { rootMargin: "0px" }).observe(hero);
+  }
+  window.addEventListener("scroll", function () {
+    pageScrolling = true;
+    clearTimeout(scrollTimer);
+    scrollTimer = setTimeout(function () { pageScrolling = false; }, 140);
+  }, { passive: true });
 
   function animate() {
     requestAnimationFrame(animate);
     var nowMs = performance.now();
+    if (!sceneVisible || document.hidden) {
+      clock.getDelta();
+      return;
+    }
+    if (mobileRender && pageScrolling && nowMs - lastRenderTime < 1000 / 20) return;
     if (nowMs - lastInteraction > 2000 && !sandAnimating && !camTween) {
-      if (nowMs - lastRenderTime < 1000 / 30) return;   /* 閒置：30fps，減少發熱 */
+      var idleFps = mobileRender ? 24 : 30;
+      if (nowMs - lastRenderTime < 1000 / idleFps) return;
     }
     lastRenderTime = nowMs;
     renderCount++;
@@ -924,7 +965,10 @@
         ripples.splice(ri, 1);
       }
     }
-    updateSand(dt);
+    if (!mobileRender || nowMs - lastSandUpdate >= 1000 / 30) {
+      updateSand(dt);
+      lastSandUpdate = nowMs;
+    }
 
     controls.target.y = baseTargetY + Math.sin(t * 0.25) * 0.35;   /* 鏡頭呼吸 */
     controls.update();
@@ -947,16 +991,31 @@
   window.addEventListener("resize", onResize);
 
   /* ================= 啟動（等地形載入） ================= */
+  reportBoot(50, "LOADING TERRAIN");
   Terrain.load(function (ok) {
-    buildSand();
-    buildUnmapped();
-    PROJECTS.forEach(function (p) {
-      if (!p.landmark) return;
-      if (p.landmark.type === "archive-tower") buildArchiveTower(p);
-      else if (p.landmark.type === "signal-tower") buildSignalTower(p);
+    reportBoot(64, ok ? "ASSEMBLING TERRAIN" : "GENERATING TERRAIN");
+    requestAnimationFrame(function () {
+      setTimeout(function () {
+        try {
+          buildSand();
+          reportBoot(82, "ASSEMBLING LANDMARKS");
+          buildUnmapped();
+          PROJECTS.forEach(function (p) {
+            if (!p.landmark) return;
+            if (p.landmark.type === "archive-tower") buildArchiveTower(p);
+            else if (p.landmark.type === "signal-tower") buildSignalTower(p);
+          });
+          buildFiller();
+          reportBoot(96, "CALIBRATING VIEW");
+          animate();
+          document.dispatchEvent(new CustomEvent("sandbox:ready"));
+        } catch (error) {
+          showFallback();
+          document.dispatchEvent(new CustomEvent("sandbox:error"));
+          if (DEBUG) console.error(error);
+        }
+      }, 0);
     });
-    buildFiller();
-    animate();
   });
 
   /* ================= 工具 ================= */
@@ -1030,6 +1089,15 @@
       };
     };
     window.__renderRate = function () { return renderCount; };
+    window.__performanceProfile = function () {
+      return {
+        mobile: mobileRender,
+        pixelRatio: renderer.getPixelRatio(),
+        shadowMap: sun.shadow.mapSize.x,
+        sceneVisible: sceneVisible,
+        pageScrolling: pageScrolling
+      };
+    };
     window.__sandDebug = function () {
       var maxD = 0, cnt = 0;
       for (var i = 0; i < sandCount; i++) {
