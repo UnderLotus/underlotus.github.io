@@ -188,6 +188,7 @@ a { color: inherit; text-decoration: none; }
   font-size: 9.5px; color: var(--ink-soft); letter-spacing: .18em;
   writing-mode: vertical-rl;
 }
+.mobile-scroll-cue { display: none; }
 
 /* 場景地標標籤（CSS2D） */
 .tag {
@@ -442,14 +443,51 @@ a { color: inherit; text-decoration: none; }
 
   .frame i { width: 14px; height: 14px; }
   .frame .tl, .frame .tr { top: calc(266px + env(safe-area-inset-top)); }
-  .frame .bl, .frame .br { bottom: 58px; }
+  .frame .bl, .frame .br { bottom: 74px; }
   .frame .tl, .frame .bl { left: 14px; }
   .frame .tr, .frame .br { right: 14px; }
   .legend {
-    right: 18px;
-    bottom: calc(16px + env(safe-area-inset-bottom));
+    left: 18px;
+    right: auto;
+    bottom: calc(18px + env(safe-area-inset-bottom));
     font-size: 9px;
   }
+  .mobile-scroll-cue {
+    position: absolute;
+    right: 14px;
+    bottom: calc(8px + env(safe-area-inset-bottom));
+    z-index: 22;
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    min-width: 104px;
+    min-height: 48px;
+    padding: 0 4px 0 10px;
+    color: var(--ink-soft);
+    font-size: 9px;
+    letter-spacing: .14em;
+    background: linear-gradient(90deg, rgba(241,243,241,0), rgba(241,243,241,.72));
+  }
+  .mobile-scroll-cue i {
+    position: relative;
+    display: block;
+    width: 22px;
+    height: 30px;
+    border-left: 1px solid var(--signal);
+  }
+  .mobile-scroll-cue i::after {
+    content: "";
+    position: absolute;
+    left: -4px;
+    bottom: 1px;
+    width: 7px;
+    height: 7px;
+    border-right: 1px solid var(--signal);
+    border-bottom: 1px solid var(--signal);
+    transform: rotate(45deg);
+  }
+  .mobile-scroll-cue:active { color: var(--ink); }
 
   .section {
     width: 100%;

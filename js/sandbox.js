@@ -847,6 +847,7 @@
     var moved = Math.hypot(e.clientX - downPos.x, e.clientY - downPos.y);
     downPos = null;
     if (moved > 6) return;
+    updateCursorGround(e);   /* tap 不一定觸發 pointermove：以實際放開位置重新投影 */
     var id = hitTest(e);
     if (id) {
       select(id);
@@ -1037,6 +1038,12 @@
         if (d > maxD) maxD = d;
       }
       return { animating: sandAnimating, cursorOn: cursorOn, ripples: ripples.length, movedGrains: cnt, maxDisp: +maxD.toFixed(3) };
+    };
+    window.__interactionDebug = function () {
+      return {
+        cursorGround: [cursorGround.x, cursorGround.y, cursorGround.z].map(function (n) { return +n.toFixed(3); }),
+        ripples: ripples.map(function (r) { return { x: +r.x.toFixed(3), z: +r.z.toFixed(3) }; })
+      };
     };
     window.__readPixel = function (sx, sy) {
       var gl = renderer.getContext();
