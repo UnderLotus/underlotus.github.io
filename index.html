@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>underlotus — VIBE CODER · 個人沙盤</title>
+<meta name="description" content="underlotus 的個人沙盤：一個白色模型數位沙盤，登錄著 vibe coder 的專案檔案。">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=Noto+Serif+TC:wght@500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div class="page">
+
+  <!-- ============ TOP BAR ============ -->
+  <header class="topbar">
+    <nav class="topnav mono">
+      <a href="#about">01 ABOUT</a>
+      <a href="#project">02 PROJECT</a>
+      <span class="clock mono" id="clock" title="Asia/Taipei">--:--:--</span>
+    </nav>
+  </header>
+
+  <!-- ============ SANDBOX HERO ============ -->
+  <main>
+    <section id="sandbox" class="sandbox">
+      <div id="scene" class="scene" aria-label="專案沙盤：白色模型數位地景"></div>
+      <div class="frame"><i class="c tl"></i><i class="c tr"></i><i class="c bl"></i><i class="c br"></i></div>
+
+      <!-- 沙盤上的身分（隨捲動離開） -->
+      <div class="masthead">
+        <p class="mini mono">SITE/01 — DIORAMA</p>
+        <h1 class="wordmark">underlotus</h1>
+        <p class="role mono">VIBE CODER <span class="sep">·</span> TAIWAN</p>
+      </div>
+      <aside class="toc mono" id="toc" aria-label="專案目錄"></aside>
+      <div class="legend mono"><span class="lg"><i class="dot on"></i>已登錄</span><span class="lg"><i class="dot off"></i>未登錄</span></div>
+      <div class="coord mono" id="coord">N25.165 · E121.553</div>
+    </section>
+
+    <!-- ============ ABOUT ============ -->
+    <section id="about" class="section about">
+      <div class="sec-head mono"><span class="sec-idx">01</span><span class="sec-name">ABOUT</span><span class="sec-line"></span></div>
+      <div class="about-grid">
+        <div class="about-quote">
+          <p class="quote-en serif">“The wind seeks no destination,<br>flowing only to where it belongs.”</p>
+          <p class="quote-zh serif">「風從來沒有目的，只是流向他該去的地方。」</p>
+        </div>
+        <div class="about-body">
+          <p class="lede">興趣使然的開發者，與 Agent 一起施展魔法，將想像化為可能。</p>
+          <ul class="chips mono" aria-label="常用技術">
+            <li>TypeScript</li><li>React</li><li>Python</li><li>Automation</li><li>WebGL Toys</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ ARCHIVE ============ -->
+    <section id="project" class="section archive">
+      <div class="sec-head mono"><span class="sec-idx">02</span><span class="sec-name">PROJECT</span><span class="sec-line"></span></div>
+      <div class="archive-grid" id="archive-grid"></div>
+    </section>
+  </main>
+
+  <!-- ============ FOOTER ============ -->
+  <footer class="footer mono">
+    <span>© 2026 underlotus</span>
+    <a href="https://github.com/UnderLotus" target="_blank" rel="noopener">GITHUB ↗</a>
+  </footer>
+
+</div>
+
+<!-- ============ PREVIEW CARD ============ -->
+<button class="card-backdrop" id="card-backdrop" type="button" aria-label="關閉專案詳情" tabindex="-1"></button>
+<aside class="card" id="card" role="dialog" aria-modal="true" aria-labelledby="card-title" aria-hidden="true">
+  <div class="card-inner" id="card-inner"></div>
+</aside>
+
+<noscript>
+  <div class="noscript mono">此站需要 JavaScript 才能顯示沙盤。可至下方 PROJECT 區檢視專案清單。</div>
+</noscript>
+
+<!-- three.js r147 UMD：file:// 直接開也能跑 -->
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/renderers/CSS2DRenderer.js"></script>
+
+<script src="js/projects.js"></script>
+<script src="js/terrain.js"></script>
+<script src="js/site.js"></script>
+<script src="js/sandbox.js"></script>
+</body>
+</html>
