@@ -37,7 +37,7 @@
     });
     if (!UNMAPPED.hidden) {
       html +=
-        '<button class="toc-item" data-id="UNMAPPED" aria-disabled="true">' +
+        '<button class="toc-item" data-id="UNMAPPED" disabled>' +
           '<i class="dot off"></i>' +
           '<span class="idx">--</span>' +
           '<span class="toc-name">UNMAPPED</span>' +
@@ -95,8 +95,7 @@
     if (p.links.github) links += '<a href="' + p.links.github + '" target="_blank" rel="noopener">GITHUB ↗</a>';
     if (p.links.demo) links += '<a href="' + p.links.demo + '" target="_blank" rel="noopener">DEMO ↗</a>';
     inner.innerHTML =
-      '<div class="card-head mono"><span>' + p.id + ' · PROJECT ENTRY</span>' +
-        '<button class="card-close" aria-label="關閉">✕</button></div>' +
+      '<div class="card-head mono"><span>' + p.id + ' · PROJECT ENTRY</span></div>' +
       '<h2 class="card-title" id="card-title">' + p.title + '</h2>' +
       '<p class="card-slug mono">' + p.slug + '</p>' +
       '<p class="card-zh">' + p.zh + '</p>' +
@@ -108,7 +107,7 @@
         '<div class="row"><dt>ID</dt><dd>' + p.id + '</dd></div>' +
       '</dl>' +
       '<div class="card-links mono">' + links + '</div>';
-    inner.querySelector(".card-close").addEventListener("click", closeCard);
+    inner.scrollTop = 0;
   }
 
   function setTocActive(id) {
@@ -124,11 +123,14 @@
     currentId = id;
     renderCard(p);
     var card = document.getElementById("card");
+    var modal = window.innerWidth <= 640;
+    card.inert = false;
     card.classList.add("open");
     card.setAttribute("aria-hidden", "false");
+    card.setAttribute("aria-modal", modal ? "true" : "false");
     document.body.classList.add("card-open");
     var page = document.querySelector(".page");
-    if (page && window.innerWidth <= 640) page.inert = true;
+    if (page && modal) page.inert = true;
     setTocActive(id);
     requestAnimationFrame(function () {
       var close = card.querySelector(".card-close");
@@ -144,6 +146,8 @@
     if (!card.classList.contains("open")) return;
     card.classList.remove("open");
     card.setAttribute("aria-hidden", "true");
+    card.setAttribute("aria-modal", "false");
+    card.inert = true;
     document.body.classList.remove("card-open");
     var page = document.querySelector(".page");
     if (page) page.inert = false;
@@ -174,6 +178,8 @@
   document.addEventListener("sandbox:close", closeCard);
   var backdrop = document.getElementById("card-backdrop");
   if (backdrop) backdrop.addEventListener("click", closeCard);
+  var closeButton = document.querySelector("#card > .card-close");
+  if (closeButton) closeButton.addEventListener("click", closeCard);
   /* 鍵盤 ESC 關卡 */
   document.addEventListener("keydown", function (e) {
     if (e.key === "Escape") closeCard();

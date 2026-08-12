@@ -71,7 +71,7 @@ window.UNMAPPED = {
 
 window.SITE = {
   name: "underlotus",
-  role: "VIBE CODER · TAIWAN",
+  role: "AGENTIC CODER · TAIWAN",
   coordinate: "N25.165 · E121.553",
   timezone: "Asia/Taipei",
   github: "https://github.com/UnderLotus",

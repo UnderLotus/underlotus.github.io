@@ -4,15 +4,15 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>underlotus - diorama</title>
-<meta name="description" content="underlotus — 興趣使然的開發者，與 Agent 一起施展魔法，將想像化為可能。">
+<meta name="description" content="Diorama by underlotus.">
 <meta property="og:title" content="underlotus - diorama">
-<meta property="og:description" content="興趣使然的開發者，與 Agent 一起施展魔法，將想像化為可能。">
+<meta property="og:description" content="Diorama by underlotus.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://underlotus.github.io/">
 <meta property="og:site_name" content="underlotus">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="underlotus - diorama">
-<meta name="twitter:description" content="興趣使然的開發者，與 Agent 一起施展魔法，將想像化為可能。">
+<meta name="twitter:description" content="Diorama by underlotus.">
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -63,7 +63,7 @@
       <div class="masthead">
         <p class="mini mono"><span>SITE/01</span><i aria-hidden="true"></i><span>DIORAMA</span></p>
         <h1 class="wordmark">underlotus</h1>
-        <p class="role mono"><span>VIBE CODER</span><i class="sep" aria-hidden="true"></i><span>TAIWAN</span></p>
+        <p class="role mono"><span>AGENTIC CODER</span><i class="sep" aria-hidden="true"></i><span>TAIWAN</span></p>
       </div>
       <aside class="toc mono" id="toc" aria-label="專案目錄"></aside>
       <a class="mobile-scroll-cue mono" href="#about" aria-label="前往 About 區段">
@@ -111,12 +111,17 @@
 
 <!-- ============ PREVIEW CARD ============ -->
 <button class="card-backdrop" id="card-backdrop" type="button" aria-label="關閉專案詳情" tabindex="-1"></button>
-<aside class="card" id="card" role="dialog" aria-modal="true" aria-labelledby="card-title" aria-hidden="true">
+<aside class="card" id="card" role="dialog" aria-modal="false" aria-labelledby="card-title" aria-hidden="true" inert>
+  <button class="card-close" type="button" aria-label="關閉">✕</button>
   <div class="card-inner" id="card-inner"></div>
 </aside>
 
 <noscript>
-  <div class="noscript mono">此站需要 JavaScript 才能顯示沙盤。可至下方 PROJECT 區檢視專案清單。</div>
+  <div class="noscript mono">
+    此站需要 JavaScript 才能顯示沙盤與專案清單。你仍可前往
+    <a href="https://github.com/UnderLotus" target="_blank" rel="noopener">GitHub</a>
+    查看專案。
+  </div>
 </noscript>
 
 <!-- three.js r147 UMD：file:// 直接開也能跑 -->

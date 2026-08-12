@@ -160,11 +160,18 @@
     });
 
     var dirs = [[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]];
+    /* 每組 A × B 都指向該面的外側法線，確保六個方向的 winding 一致。 */
+    var tangents = [
+      [[0,1,0],[0,0,1]], [[0,0,1],[0,1,0]],
+      [[0,0,1],[1,0,0]], [[1,0,0],[0,0,1]],
+      [[1,0,0],[0,1,0]], [[0,1,0],[1,0,0]]
+    ];
     var face = [];
 
     function pushFace(mi, cx, cy, cz, n, ax, ay, az, bx, by, bz, tint, shades) {
-      var f = face[mi] || (face[mi] = { pos: [], nrm: [], col: [] });
+      var f = face[mi] || (face[mi] = { pos: [], nrm: [], col: [], idx: [] });
       var s = (BLOCK - GAP) / 2;
+      var base = f.pos.length / 3;
       var v = [
         cx - ax*s - bx*s, cy - ay*s - by*s, cz - az*s - bz*s,
         cx + ax*s - bx*s, cy + ay*s - by*s, cz + az*s - bz*s,
@@ -177,6 +184,7 @@
         f.nrm.push(n[0], n[1], n[2]);
         f.col.push(cc, cc, cc);
       }
+      f.idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
     }
 
     /* 遮蔽測試：地面（y<0）永遠算遮蔽 → 接觸陰影 */
@@ -196,8 +204,7 @@
         var cx = (c[0] + 0.5 + n[0] * 0.5) * BLOCK;
         var cy = (c[1] + 0.5 + n[1] * 0.5) * BLOCK;
         var cz = (c[2] + 0.5 + n[2] * 0.5) * BLOCK;
-        var axes = [[1,0,0],[0,1,0],[0,0,1]].filter(function (a) { return a[0] !== n[0] || a[1] !== n[1] || a[2] !== n[2]; });
-        var A = axes[0], B = axes[1];
+        var A = tangents[d][0], B = tangents[d][1];
         /* 四角 AO：side1 / side2 / corner 遮蔽 → 縫隙與接觸處自然變暗 */
         var shades = [[-1,-1],[1,-1],[1,1],[-1,1]].map(function (sg) {
           var sa = sg[0], sb = sg[1];
@@ -218,6 +225,7 @@
       geo.setAttribute("position", new THREE.Float32BufferAttribute(f.pos, 3));
       geo.setAttribute("normal", new THREE.Float32BufferAttribute(f.nrm, 3));
       geo.setAttribute("color", new THREE.Float32BufferAttribute(f.col, 3));
+      geo.setIndex(f.idx);
       var mesh = new THREE.Mesh(geo, matList[mi]);
       mesh.castShadow = true;
       mesh.receiveShadow = true;
@@ -261,12 +269,21 @@
   var sandBase = null, sandQuat = null, sandScale = null, sandDisp = null;
   var sandAnimating = false;
   var cursorOn = false;
-  var lastCursorMove = 0;
   var cursorGround = new THREE.Vector3(9999, 0, 9999);
   var cursorSmooth = new THREE.Vector3(9999, 0, 9999);
   var cursorVel = new THREE.Vector3();
   var lastCursor = new THREE.Vector3();
   var ripples = [];
+  var turbineRotors = [];
+  var SAND_BUCKET_SIZE = 4.8;
+  var sandBuckets = Object.create(null);
+  var sandActive = new Set();
+  var sandNextActive = new Set();
+  var sandCandidates = new Set();
+
+  function sandBucketKey(x, z) {
+    return Math.floor(x / SAND_BUCKET_SIZE) + "," + Math.floor(z / SAND_BUCKET_SIZE);
+  }
 
   function buildSand() {
   var sandGeo = new THREE.BoxGeometry(BLOCK - GAP, BLOCK - GAP, BLOCK - GAP);
@@ -311,6 +328,9 @@
       sandBase[_i * 3] = _v.x; sandBase[_i * 3 + 1] = _v.y; sandBase[_i * 3 + 2] = _v.z;
       sandQuat[_i * 4] = _q.x; sandQuat[_i * 4 + 1] = _q.y; sandQuat[_i * 4 + 2] = _q.z; sandQuat[_i * 4 + 3] = _q.w;
       sandScale[_i] = sc;
+      var bucketKey = sandBucketKey(_v.x, _v.z);
+      if (!sandBuckets[bucketKey]) sandBuckets[bucketKey] = [];
+      sandBuckets[bucketKey].push(_i);
       /* 地形法線著色：太陽（-30,22,-18 → 單位方向 -0.726,0.533,-0.436） */
       var hxp = terrainHeight(gx + BLOCK, gz), hxm = terrainHeight(gx - BLOCK, gz);
       var hzp = terrainHeight(gx, gz + BLOCK), hzm = terrainHeight(gx, gz - BLOCK);
@@ -393,8 +413,24 @@
   function makeLabel(p, y, extraClass) {
     var el = document.createElement("div");
     el.className = "tag" + (extraClass ? " " + extraClass : "");
+    el.setAttribute("role", "button");
+    el.setAttribute("tabindex", "0");
+    el.setAttribute("aria-label", "開啟 " + p.title + " 專案詳情");
     el.innerHTML = '<span class="tag-id">' + p.id + "</span>" +
       '<span class="tag-name">' + p.slug.toUpperCase() + "</span>";
+    function activate() {
+      select(p.id);
+      document.dispatchEvent(new CustomEvent("sandbox:select", { detail: { id: p.id } }));
+    }
+    el.addEventListener("click", function (event) {
+      event.stopPropagation();
+      activate();
+    });
+    el.addEventListener("keydown", function (event) {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      activate();
+    });
     var lab = new THREE.CSS2DObject(el);
     lab.position.set(0, y, 0);
     return lab;
@@ -595,25 +631,70 @@
     };
   }
   function buildFiller() {
-    var leafM1 = vxMat(0xE6EAE6), leafM2 = vxMat(0xDDE2DE);
-    var trunkM = vxMat(0xC2C9C4);
+    var leafM1 = mkMat(0xE6EAE6, { side: THREE.DoubleSide });
+    var leafM2 = mkMat(0xDDE2DE, { side: THREE.DoubleSide });
+    var trunkM = mkMat(0xC2C9C4);
     var rockM = vxMat(0xBEC5C1);
-    var wallM1 = vxMat(0xE3E7E3), wallM2 = vxMat(0xDAE0DB);
-    var roofM = vxMat(0xCFD5D1), doorM = vxMat(0xBEC5C1);
+    var turbineM = mkMat(0xD4DAD6);
+    var turbineBladeM = mkMat(0xE8ECE8, { side: THREE.DoubleSide });
+    var turbineTowerGeo = new THREE.CylinderGeometry(0.18, 0.34, 5.2, 6);
+    var turbineHubGeo = new THREE.SphereGeometry(0.34, 8, 6);
+    var turbineNacelleGeo = new THREE.BoxGeometry(0.55, 0.42, 0.9);
+    var turbineBladeGeo = new THREE.BufferGeometry();
+    turbineBladeGeo.setAttribute("position", new THREE.Float32BufferAttribute([
+      -0.10, 0.28, 0,
+       0.12, 0.28, 0,
+       0.28, 2.05, 0,
+      -0.14, 1.68, 0
+    ], 3));
+    turbineBladeGeo.setIndex([0, 1, 2, 0, 2, 3]);
+    turbineBladeGeo.computeVertexNormals();
+
+    /* 有意留縫的三角碎片樹冠；兩份 geometry 交錯材質，但共用於所有樹。 */
+    function treeShardGeometry(parity) {
+      var pos = [];
+      function band(count, baseY, tipY, radius, tipRadius, phase) {
+        for (var i = 0; i < count; i++) {
+          if (i % 2 !== parity) continue;
+          var center = phase + i / count * Math.PI * 2;
+          var half = Math.PI / count * 0.58;
+          var tipAngle = center + (i % 2 ? -0.16 : 0.16);
+          var leftY = baseY + (i % 3) * 0.08;
+          var rightY = baseY + ((i + 1) % 3) * 0.08;
+          pos.push(
+            Math.cos(center - half) * radius, leftY, Math.sin(center - half) * radius,
+            Math.cos(center + half) * radius, rightY, Math.sin(center + half) * radius,
+            Math.cos(tipAngle) * tipRadius, tipY, Math.sin(tipAngle) * tipRadius
+          );
+        }
+      }
+      band(6, 1.05, 3.20, 1.48, 0.16, 0.00);
+      band(5, 2.00, 4.05, 1.12, 0.12, 0.34);
+      band(4, 2.95, 4.62, 0.76, 0.08, 0.10);
+      var geo = new THREE.BufferGeometry();
+      geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+      geo.computeVertexNormals();
+      return geo;
+    }
+    var treeShardGeo1 = treeShardGeometry(0);
+    var treeShardGeo2 = treeShardGeometry(1);
 
     function tree(tx, tz, s, ry) {
-      var mats = [vxMat(0xE3E8E4), trunkM, leafM1, leafM2];
       var g = new THREE.Group();
       g.position.set(tx, Terrain.ready() ? Terrain.height(tx, tz) : 0, tz);
       g.scale.setScalar(s);
       g.rotation.y = ry;
-      var b = [];
-      sandMound(b, 0, 0, 2, 2, 0);                 /* 小沙錐 */
-      b.push([-0.5, 2, -0.5, 1, 2, 1, 1]);         /* 樹幹 */
-      b.push([-1.5, 4, -1.5, 3, 1, 3, 2]);         /* 樹冠：矮而圓 */
-      b.push([-1, 5, -1, 2, 1, 2, 3]);
-      b.push([-0.5, 6, -0.5, 1, 1, 1, 2]);
-      g.add(voxelModel(b, mats));
+
+      /* 明確建立的破碎三角面樹冠，不再依賴錯誤的 voxel 面。 */
+      var trunk = new THREE.Mesh(new THREE.BoxGeometry(0.48, 1.35, 0.48), trunkM);
+      trunk.position.y = 0.675;
+      var shards1 = new THREE.Mesh(treeShardGeo1, leafM1);
+      var shards2 = new THREE.Mesh(treeShardGeo2, leafM2);
+      [trunk, shards1, shards2].forEach(function (mesh) {
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        g.add(mesh);
+      });
       scene.add(g);
     }
 
@@ -691,25 +772,44 @@
       rcount++;
     }
 
-    function house(hx, hz, w, d, wallMat) {
-      var mats = [vxMat(0xE3E8E4), wallMat, roofM, doorM];
-      var hg = new THREE.Group();
-      hg.position.set(hx, Terrain.ready() ? Terrain.height(hx, hz) : 0, hz);
-      var bx = toB(0), bz = toB(0);
-      var b = [];
-      sandMound(b, bx, bz, 3, 2, 0);               /* 小沙基 */
-      b.push([bx - w / 2, 2, bz - d / 2, w, 2, d, 1]);
-      b.push([bx - w / 2 - 0.5, 4, bz - d / 2 - 0.5, w + 1, 1, d + 1, 2]);
-      b.push([bx - 0.5, 5, bz - 0.5, 1, 1, 1, 1]);
-      b.push([bx - 0.5, 2, bz + d / 2 - 0.5, 1, 2, 1, 3]);
-      hg.add(voxelModel(b, mats));
-      scene.add(hg);
+    /* 山脊上的小型風力發電機：以清楚的三葉輪廓取代封閉小屋。 */
+    function windTurbine(hx, hz, scale, facing, bladeAngle, speed) {
+      var tg = new THREE.Group();
+      tg.position.set(hx, Terrain.ready() ? Terrain.height(hx, hz) : 0, hz);
+      tg.scale.setScalar(scale);
+      tg.rotation.y = facing;
+
+      var tower = new THREE.Mesh(turbineTowerGeo, turbineM);
+      tower.position.y = 2.6;
+      var nacelle = new THREE.Mesh(turbineNacelleGeo, turbineM);
+      nacelle.position.set(0, 5.12, 0.12);
+      var rotor = new THREE.Group();
+      rotor.position.set(0, 5.18, 0.62);
+      rotor.rotation.z = bladeAngle;
+      for (var i = 0; i < 3; i++) {
+        var blade = new THREE.Mesh(turbineBladeGeo, turbineBladeM);
+        blade.rotation.z = i * Math.PI * 2 / 3;
+        rotor.add(blade);
+      }
+      var hub = new THREE.Mesh(turbineHubGeo, turbineM);
+      rotor.add(hub);
+      turbineRotors.push({ rotor: rotor, speed: speed });
+      [tower, nacelle, hub].forEach(function (mesh) {
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+      });
+      rotor.children.forEach(function (mesh) {
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+      });
+      tg.add(tower, nacelle, rotor);
+      scene.add(tg);
     }
-    house(6, 58, 4, 3, wallM1);
-    house(11, 66, 3, 3, wallM2);
-    house(-18, 48, 2.5, 2.5, wallM2);
-    house(-28, 60, 3.5, 3, wallM1);
-    house(22, 62, 3, 2.5, wallM2);
+    /* 依高度圖沿東側高地疏列，約 1 km 間距，避開專案地標。 */
+    windTurbine(20, 29, 0.76, 0.10, 0.18, 0.34);
+    windTurbine(29, 20, 0.82, 0.04, 0.88, 0.31);
+    windTurbine(38, 26, 0.86, -0.08, 1.42, 0.36);
+    windTurbine(47, 23, 0.78, 0.06, 0.54, 0.32);
   }
 
   /* ================= 互動：hover / 選取 ================= */
@@ -751,48 +851,103 @@
     var ring = new THREE.Mesh(
       new THREE.RingGeometry(0.92, 1.08, 64),
       new THREE.MeshBasicMaterial({
-        color: 0xD4B23E, transparent: true, opacity: 0.55,
+        color: 0xFFFFFF, transparent: true, opacity: 0.55,
         side: THREE.DoubleSide, depthWrite: false
       })
     );
     ring.rotation.x = -Math.PI / 2;
     ring.position.set(x, h + 0.07, z);
     scene.add(ring);
-    ripples.push({ x: x, z: z, r: 1.4, maxR: 26, speed: 32, age: 0, dur: 1.5, ring: ring });
+    ripples.push({
+      x: x, z: z, r: 1.4, maxR: 34, speed: 18,
+      age: 0, dur: 2.5, fade: 1, baseY: h + 0.07, ring: ring
+    });
   }
 
   /* 沙粒位移：游標推沙 + 漣漪環帶（每幀更新被影響的沙粒矩陣） */
   var _tmpM = new THREE.Matrix4();
   var _tmpQ = new THREE.Quaternion();
+  var _tmpTiltQ = new THREE.Quaternion();
+  var _tmpAxis = new THREE.Vector3();
   var _tmpV = new THREE.Vector3();
   var _tmpS = new THREE.Vector3();
+
+  function collectSandCandidates(x, z, outer, inner) {
+    var minX = Math.floor((x - outer) / SAND_BUCKET_SIZE);
+    var maxX = Math.floor((x + outer) / SAND_BUCKET_SIZE);
+    var minZ = Math.floor((z - outer) / SAND_BUCKET_SIZE);
+    var maxZ = Math.floor((z + outer) / SAND_BUCKET_SIZE);
+    var halfDiagonal = SAND_BUCKET_SIZE * Math.SQRT2 / 2;
+    for (var cellX = minX; cellX <= maxX; cellX++) {
+      for (var cellZ = minZ; cellZ <= maxZ; cellZ++) {
+        var centerX = (cellX + 0.5) * SAND_BUCKET_SIZE;
+        var centerZ = (cellZ + 0.5) * SAND_BUCKET_SIZE;
+        var centerDistance = Math.hypot(centerX - x, centerZ - z);
+        if (centerDistance - halfDiagonal > outer) continue;
+        if (inner > 0 && centerDistance + halfDiagonal < inner) continue;
+        var bucket = sandBuckets[cellX + "," + cellZ];
+        if (!bucket) continue;
+        for (var bi = 0; bi < bucket.length; bi++) sandCandidates.add(bucket[bi]);
+      }
+    }
+  }
+
   function updateSand(dt) {
-    var n = sandCount;
-    if (cursorOn && performance.now() - lastCursorMove > 1500) cursorOn = false;   /* 靜止就停推 */
-    if (!sandAnimating && !cursorOn && ripples.length === 0) return;
+    if (!sandAnimating && ripples.length === 0) return;
     sandAnimating = true;
-    cursorSmooth.lerp(cursorGround, 0.16);
-    cursorVel.multiplyScalar(0.88);            /* 速度衰減：停下來就不推 */
-    var R = 4.0, R2 = R * R;
+    var follow = 1 - Math.exp(-18 * dt);
+    cursorSmooth.lerp(cursorGround, follow);
+    cursorVel.multiplyScalar(Math.exp(-7.5 * dt));   /* 時間制衰減：不同 FPS 手感一致 */
+    var R = 9.0, CORE = 1.65, R2 = R * R;
     var dirty = false;
-    var maxD = 0;
     var cx = cursorSmooth.x, cz = cursorSmooth.z;
     var vx = cursorVel.x, vz = cursorVel.z;
-    for (var i = 0; i < n; i++) {
+    var cursorSpeed = Math.hypot(vx, vz);
+
+    sandCandidates.clear();
+    sandActive.forEach(function (i) { sandCandidates.add(i); });
+    if (cursorOn) collectSandCandidates(cx, cz, R, 0);
+    for (var qr = 0; qr < ripples.length; qr++) {
+      var queryRipple = ripples[qr];
+      collectSandCandidates(
+        queryRipple.x, queryRipple.z,
+        queryRipple.r + 1.8,
+        Math.max(0, queryRipple.r - 1.8)
+      );
+    }
+    sandNextActive.clear();
+
+    sandCandidates.forEach(function (i) {
       var bx = sandBase[i * 3], by = sandBase[i * 3 + 1], bz = sandBase[i * 3 + 2];
       var tx = 0, ty = 0, tz = 0;
+      var driven = false;
+      var effectStrength = 0;
       if (cursorOn) {
         var dx = bx - cx, dz = bz - cz;
         var d2 = dx * dx + dz * dz;
         if (d2 < R2) {
+          driven = true;
           var d = Math.sqrt(d2) + 0.001;
-          var fall = 1 - d / R;
-          var push = fall * fall;
-          tx += (dx / d) * push * 0.55;     /* 推開（柔和） */
-          tz += (dz / d) * push * 0.55;
-          ty += push * 0.7;                  /* 隆起（柔和） */
-          tx += vx * fall * 0.06;            /* 順著游標移動方向流動（輕微） */
-          tz += vz * fall * 0.06;
+          var density = Math.exp(-Math.pow(d / 4.55, 1.7));
+          var chance = cellHash(bx * 1.7, 19, bz * 1.7);
+          var coreWeight = Math.max(0, 1 - d / CORE);
+          var participation = Math.max(coreWeight, Math.max(0, Math.min(1, (density - chance * 0.78) * 2.4)));
+          if (participation > 0.002) {
+            var field = density * participation;
+            effectStrength = field;
+            var clear = Math.max(0, CORE - d) * (0.68 + cellHash(bx, 23, bz) * 0.18);
+            var repel = clear + field * 0.42;
+            var nx2 = dx / d, nz2 = dz / d;
+            var tangent = (cellHash(bx, 29, bz) - 0.5) * field * 0.62;
+            tx += nx2 * repel - nz2 * tangent;
+            tz += nz2 * repel + nx2 * tangent;
+            ty += (cellHash(bx, 31, bz) - 0.48) * field * 0.86;
+            var lead = Math.min(1, cursorSpeed / 10) * field * 0.006;
+            tx += vx * lead;
+            tz += vz * lead;
+          } else {
+            driven = false;
+          }
         }
       }
       for (var r = 0; r < ripples.length; r++) {
@@ -802,32 +957,48 @@
         var bw = 1.8;
         var dd = Math.abs(rd - rp.r);
         if (dd < bw) {
-          var k = (1 - dd / bw) * 1.0;
-          tx += (rx / rd) * k;
-          tz += (rz / rd) * k;
-          ty += k * k * 2.4;
+          driven = true;
+          var k = (1 - dd / bw) * rp.fade;
+          effectStrength = Math.max(effectStrength, k);
+          tx += (rx / rd) * k * 0.58;
+          tz += (rz / rd) * k * 0.58;
+          ty += k * 1.15;
         }
       }
-      /* 不對稱響應：有推力時快速隆起，放手後極慢平復（漣漪/手指留痕幾秒） */
+      /* 排斥場快速讓位；游標離開後平滑回到原始沙床。 */
       var px = sandDisp[i * 3], py = sandDisp[i * 3 + 1], pz = sandDisp[i * 3 + 2];
-      var s = (tx * tx + ty * ty + tz * tz > 0.0001) ? 0.18 : 0.03;
+      var rate = driven ? 15 : 4.2;
+      var s = 1 - Math.exp(-rate * dt);
       var nx = px + (tx - px) * s;
       var ny = py + (ty - py) * s;
       var nz = pz + (tz - pz) * s;
       var md = Math.max(Math.abs(nx), Math.abs(ny), Math.abs(nz));
-      if (md > maxD) maxD = md;
+      if (!driven && md < 0.018) {
+        nx = 0; ny = 0; nz = 0; md = 0;           /* 微小殘差歸零，避免永久掃描 */
+      }
+      if (driven || md > 0) sandNextActive.add(i);
       if (Math.abs(nx - px) > 0.0005 || Math.abs(ny - py) > 0.0005 || Math.abs(nz - pz) > 0.0005) {
         sandDisp[i * 3] = nx; sandDisp[i * 3 + 1] = ny; sandDisp[i * 3 + 2] = nz;
         _tmpQ.set(sandQuat[i * 4], sandQuat[i * 4 + 1], sandQuat[i * 4 + 2], sandQuat[i * 4 + 3]);
+        var visual = Math.max(Math.min(1, md / 0.52), Math.min(1, effectStrength) * 0.82);
+        var tiltAngle = cellHash(bx, 37, bz) * Math.PI * 2;
+        _tmpAxis.set(Math.cos(tiltAngle), 0, Math.sin(tiltAngle));
+        _tmpTiltQ.setFromAxisAngle(_tmpAxis, visual * (0.10 + cellHash(bx, 41, bz) * 0.14));
+        _tmpQ.multiply(_tmpTiltQ);
         _tmpV.set(bx + nx, by + ny, bz + nz);
-        _tmpS.setScalar(sandScale[i]);
+        var scaleBoost = 1 + visual * (0.10 + cellHash(bx, 43, bz) * 0.08);
+        _tmpS.setScalar(sandScale[i] * scaleBoost);
         _tmpM.compose(_tmpV, _tmpQ, _tmpS);
         sandMesh.setMatrixAt(i, _tmpM);
         dirty = true;
       }
-    }
+    });
+
+    var activeSwap = sandActive;
+    sandActive = sandNextActive;
+    sandNextActive = activeSwap;
     if (dirty) sandMesh.instanceMatrix.needsUpdate = true;
-    if (!cursorOn && ripples.length === 0 && maxD < 0.004) sandAnimating = false;
+    if (ripples.length === 0 && !dirty) sandAnimating = false;
   }
 
   function setHover(id) {
@@ -891,12 +1062,13 @@
     setHover(hitTest(e));
     updateCursorGround(e);
     cursorOn = true;
-    lastCursorMove = performance.now();
+    sandAnimating = true;
     lastInteraction = performance.now();
     var jump = Math.hypot(cursorGround.x - lastCursor.x, cursorGround.z - lastCursor.z);
     if (jump > 25) {
       /* 首次移動 / 大跳躍：不產生速度 */
       lastCursor.copy(cursorGround);
+      cursorSmooth.copy(cursorGround);
       cursorVel.set(0, 0, 0);
     } else {
       cursorVel.set((cursorGround.x - lastCursor.x) * 60, 0, (cursorGround.z - lastCursor.z) * 60);
@@ -907,6 +1079,7 @@
   });
   renderer.domElement.addEventListener("pointerleave", function () {
     cursorOn = false;
+    sandAnimating = true;
   });
   renderer.domElement.addEventListener("pointerup", function (e) {
     if (!downPos) return;
@@ -1005,15 +1178,25 @@
       if (glowMat) glowMat.opacity = 0.45 + 0.4 * pulse;
     }
 
+    if (!RM) {
+      turbineRotors.forEach(function (turbine) {
+        turbine.rotor.rotation.z += dt * turbine.speed;
+      });
+    }
+
     /* 漣漪：金圈外擴 + 消失 */
     for (var ri = ripples.length - 1; ri >= 0; ri--) {
       var rp = ripples[ri];
       rp.r += dt * rp.speed;
       rp.age += dt;
-      var kk = Math.min(1, rp.r / rp.maxR);
-      rp.ring.scale.set(kk, kk, 1);
-      rp.ring.material.opacity = 0.5 * (1 - kk) * Math.max(0, 1 - rp.age / rp.dur);
-      if (rp.age > rp.dur) {
+      var radiusProgress = Math.min(1, rp.r / rp.maxR);
+      var life = Math.max(0, 1 - rp.age / rp.dur);
+      var edge = 1 - Math.max(0, Math.min(1, (radiusProgress - 0.76) / 0.24));
+      rp.fade = Math.pow(life, 1.35) * edge;
+      rp.ring.scale.set(rp.r, rp.r, 1);
+      rp.ring.material.opacity = 0.44 * rp.fade;
+      rp.ring.position.y = rp.baseY - (1 - rp.fade) * 0.13;
+      if (rp.fade < 0.005 || rp.age >= rp.dur) {
         scene.remove(rp.ring);
         rp.ring.geometry.dispose();
         rp.ring.material.dispose();
@@ -1160,7 +1343,15 @@
         if (d > 0.004) cnt++;
         if (d > maxD) maxD = d;
       }
-      return { animating: sandAnimating, cursorOn: cursorOn, ripples: ripples.length, movedGrains: cnt, maxDisp: +maxD.toFixed(3) };
+      return {
+        animating: sandAnimating,
+        cursorOn: cursorOn,
+        ripples: ripples.length,
+        activeGrains: sandActive.size,
+        candidateGrains: sandCandidates.size,
+        movedGrains: cnt,
+        maxDisp: +maxD.toFixed(3)
+      };
     };
     window.__interactionDebug = function () {
       return {
