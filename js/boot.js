@@ -59,11 +59,20 @@
           boot.setAttribute("aria-hidden", "true");
           document.documentElement.classList.remove("booting");
         }
-        boot.addEventListener("transitionend", function (event) {
-          if (event.target === boot && event.propertyName === "transform") removeBoot();
-        }, { once: true });
-        setTimeout(function () { boot.classList.add("departing"); }, reducedMotion ? 0 : 180);
-        setTimeout(removeBoot, reducedMotion ? 40 : 1100);
+        /* reduced-motion：不做 translateY 整頁拉開，改短淡出（opacity transition） */
+        if (reducedMotion) {
+          boot.addEventListener("transitionend", function (event) {
+            if (event.target === boot && event.propertyName === "opacity") removeBoot();
+          }, { once: true });
+          boot.classList.add("departing");
+          setTimeout(removeBoot, 320);   /* 保險：即使 transition 未觸發也不卡住 */
+        } else {
+          boot.addEventListener("transitionend", function (event) {
+            if (event.target === boot && event.propertyName === "transform") removeBoot();
+          }, { once: true });
+          setTimeout(function () { boot.classList.add("departing"); }, 180);
+          setTimeout(removeBoot, 1100);
+        }
       }
       requestAnimationFrame(fill);
     }, wait);

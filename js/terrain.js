@@ -1,6 +1,9 @@
 /* ============================================================
  * terrain.js —— 真實地形（台北 七星山—陽明山—盆地 橫斷面）
  * 來源：Mapzen/AWS elevation-tiles-prod（terrarium 格式，公開發布）
+ * 高度圖已於開發期預處理（tools/terrain-preprocess.js）：
+ *   clamp → 2×3×3 boxBlur → 降採樣 768×768 → 8-bit gray（min/max 縮放）
+ * 此檔案只負責 decode + bilinear interpolation，不再做影像處理。
  * 世界座標 → 圖素 → 雙線性插值；沙盤邊緣漸平融入霧
  * ============================================================ */
 window.Terrain = (function () {
@@ -14,22 +17,8 @@ window.Terrain = (function () {
   var FADE_R = 85;       /* 邊緣漸平：僅外緣 85-135（28.8km² 地形幾乎全覆蓋） */
   var FADE_MAX = 135;
 
-  function boxBlur(src, w, h) {
-    var out = new Float32Array(w * h);
-    for (var y = 0; y < h; y++) {
-      for (var x = 0; x < w; x++) {
-        var s = 0, n = 0;
-        for (var dy = -1; dy <= 1; dy++) {
-          for (var dx = -1; dx <= 1; dx++) {
-            var xx = x + dx, yy = y + dy;
-            if (xx >= 0 && xx < w && yy >= 0 && yy < h) { s += src[yy * w + xx]; n++; }
-          }
-        }
-        out[y * w + x] = s / n;
-      }
-    }
-    return out;
-  }
+  /* 預處理 heightmap 的 min/max（公尺），與 tools/terrain-preprocess.js 一致 */
+  var VMIN = 0, VMAX = 1102.4;
 
   function load(cb) {
     var img = new Image();
@@ -41,12 +30,11 @@ window.Terrain = (function () {
         var g = c.getContext("2d");
         g.drawImage(img, 0, 0);
         var d = g.getImageData(0, 0, W, H).data;
-        var raw = new Float32Array(W * H);
+        map = new Float32Array(W * H);
         for (var i = 0; i < W * H; i++) {
-          var e = (d[i * 4] * 256 + d[i * 4 + 1] + d[i * 4 + 2] / 256) - 32768;
-          raw[i] = e > 0 ? e : 0;
+          /* 8-bit gray：0–255 → VMIN–VMAX（公尺） */
+          map[i] = VMIN + (d[i * 4] / 255) * (VMAX - VMIN);
         }
-        map = boxBlur(boxBlur(raw, W, H), W, H);
         ok = true;
       } catch (err) {
         ok = false;
@@ -54,7 +42,7 @@ window.Terrain = (function () {
       cb(ok);
     };
     img.onerror = function () { ok = false; cb(false); };
-    img.src = "assets/terrain.png";
+    img.src = "assets/terrain.heightmap.png";
   }
 
   /* 世界座標 → 海拔（world units，含邊緣漸平） */

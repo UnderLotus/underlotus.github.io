@@ -35,8 +35,16 @@
 html { scroll-behavior: smooth; }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
-  * { transition-duration: .01ms !important; animation-duration: .01ms !important; }
+  /* 只關閉裝飾性動畫（scroll cue），不全域摧毀 transition */
   .scroll-cue-mark path { animation: none !important; opacity: 1; stroke-dashoffset: 0; }
+  /* boot 離場：不做整頁 translateY 拉開，改短淡出（與 boot.js 的 reduced 路徑搭配） */
+  .boot { transition: opacity .2s ease; }
+  .boot.departing { transform: none; opacity: 0; }
+  /* 專案詳情卡：跳過滑入/淡入 transition，直接切換 */
+  .card, .card.open, .card-backdrop { transition: none; }
+  /* archive 卡片 hover 位移也關閉（保留顏色變化） */
+  .arc-card, .arc-card::before { transition: border-color .2s ease, color .2s ease; }
+  .arc-card:hover { transform: none; }
 }
 
 body {
