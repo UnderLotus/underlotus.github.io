@@ -14,9 +14,11 @@
  *   status  LIVE / ACTIVE / IDLE（會決定狀態點的顏色）
  *   links   github / demo / 其他外連（沒有的欄位留空字串）
  *   landmark 地標設定：
- *     type   collection-library（收藏圖書館）| signal-tower（訊號塔）| monolith（方碑）| silo（筒倉）| dome（穹頂）| kiosk（小站）
+ *     type   collection-library（收藏圖書館）| signal-tower（訊號塔）| fleet-carrier（艦隊航母）
  *     pos    座標 [x, z]（以沙盤中心為原點，地面為 y=0）
  *     scale  縮放（預設 1）
+ *     rotation Y 軸旋轉（弧度，預設 0）
+ *     clearance 周圍填充物的淨空半徑（預設 10）
  * ============================================================ */
 
 window.PROJECTS = [
@@ -56,6 +58,27 @@ window.PROJECTS = [
       type: "signal-tower",
       pos: [4, 50],
       scale: 1
+    }
+  },
+  {
+    id: "PRJ-003",
+    slug: "r1999-timekeeper-fleet",
+    title: "R1999 Timekeeper Fleet",
+    zh: "《重返未來：1999》角色、心相與隊伍配置管理工具——記錄養成狀態、組建隊伍，並透過連結或圖片分享配置。",
+    desc: "A small tool for organizing Reverse: 1999 characters, psychubes, and team configurations.",
+    tags: ["React", "TypeScript", "Zustand", "Vite", "GitHub Pages"],
+    year: "2026",
+    status: "LIVE",
+    links: {
+      github: "https://github.com/UnderLotus/r1999-timekeeper-fleet",
+      demo: "https://underlotus.github.io/r1999-timekeeper-fleet/"
+    },
+    landmark: {
+      type: "fleet-carrier",
+      pos: [31, 38],
+      scale: 0.7,
+      rotation: -0.18,
+      clearance: 12
     }
   }
 ];

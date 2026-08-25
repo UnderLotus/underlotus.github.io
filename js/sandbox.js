@@ -62,14 +62,18 @@
   var baseTargetY = isNarrow() ? 3 : 2;
   function applyCameraFraming() {
     if (isNarrow()) {
-      camera.position.set(0, 150, 95);
-      controls.target.set(0, 3, 24);
+      /* 三個地標橫跨沙盤：略往東取景並放寬 FOV，讓航母與圖書館都完整入鏡。 */
+      camera.fov = 58;
+      camera.position.set(8, 145, 95);
+      controls.target.set(8, 3, 24);
       baseTargetY = 3;
     } else {
+      camera.fov = 42;
       camera.position.set(0, 66, 128);
       controls.target.set(0, 2, 38);
       baseTargetY = 2;
     }
+    camera.updateProjectionMatrix();
   }
 
   var controls = new THREE.OrbitControls(camera, renderer.domElement);
@@ -583,6 +587,73 @@
     return L;
   }
 
+  /* ---- PRJ-003 艦隊航母：沙海船身 + 四組編隊甲板 + 偏置艦島 ---- */
+  function buildFleetCarrier(p) {
+    var g = new THREE.Group();
+    var bh = Terrain.ready() ? Terrain.height(p.landmark.pos[0], p.landmark.pos[1]) : 0;
+    g.position.set(p.landmark.pos[0], bh, p.landmark.pos[1]);
+    g.rotation.y = p.landmark.rotation || 0;
+    g.scale.setScalar(p.landmark.scale || 1);
+
+    var mats = [
+      vxMat(0xE3E7E3),   /* 0 沙浪／航跡 */
+      vxMat(0xB4BDB8),   /* 1 下層船身 */
+      vxMat(0xC6CECA),   /* 2 上層船身／艦島 */
+      vxMat(0xDDE2DE),   /* 3 飛行甲板 */
+      vxMat(0xEDF0ED),   /* 4 甲板線／桅杆 */
+      vxMat(0xAEB7B2)    /* 5 編隊區／艦橋窗帶 */
+    ];
+    var b = [];
+
+    /* 船尾與兩舷的斷續沙浪：讓長船像在沙海前進，不另蓋方形地台。 */
+    b.push([-25, 0, -6, 8, 1, 2, 0]);
+    b.push([-24, 0, 4, 7, 1, 2, 0]);
+    b.push([-22, 0, -2, 5, 1, 4, 0]);
+    b.push([-14, 0, -7, 8, 1, 1, 0]);
+    b.push([-3, 0, -7, 7, 1, 1, 0]);
+    b.push([-13, 0, 6, 10, 1, 1, 0]);
+    b.push([1, 0, 6, 6, 1, 1, 0]);
+
+    /* 下層與上層船身逐段收尖，俯視時有清楚船首，而不是長方形建築。 */
+    b.push([-18, 0, -4, 31, 2, 8, 1]);
+    b.push([13, 0, -3, 4, 2, 6, 1]);
+    b.push([17, 0, -2, 2, 2, 4, 1]);
+    b.push([19, 0, -1, 1, 2, 2, 1]);
+    b.push([-18, 2, -5, 31, 2, 10, 2]);
+    b.push([13, 2, -4, 4, 2, 8, 2]);
+    b.push([17, 2, -2, 2, 2, 4, 2]);
+    b.push([19, 2, -1, 1, 2, 2, 2]);
+
+    /* 寬甲板與逐階收窄的船首。 */
+    b.push([-19, 4, -6, 32, 1, 12, 3]);
+    b.push([13, 4, -4, 4, 1, 8, 3]);
+    b.push([17, 4, -2, 2, 1, 4, 3]);
+    b.push([19, 4, -1, 1, 1, 2, 3]);
+
+    /* 四個平嵌式編隊區對應工具中的四組 Team，不堆成小飛機。 */
+    [-15, -9, -3, 3].forEach(function (x) {
+      b.push([x, 4, -4, 4, 1, 3, 5]);
+    });
+    b.push([-16, 4, 0, 27, 1, 1, 4]);              /* 甲板中線 */
+    b.push([11, 4, -1, 2, 1, 3, 4]);               /* 船首導引線 */
+
+    /* 偏置艦島：低橋樓、深色窗帶、短桅與橫向雷達。 */
+    b.push([-6, 5, 2, 8, 2, 3, 2]);
+    b.push([-5, 7, 2, 6, 3, 3, 4]);
+    b.push([-4, 8, 4, 4, 1, 1, 5]);
+    b.push([-3, 10, 3, 1, 5, 1, 4]);
+    b.push([-5, 12, 3, 5, 1, 1, 5]);
+    b.push([-4, 15, 3, 3, 1, 1, 4]);
+
+    g.add(voxelModel(b, mats));
+    markerPylon(g, -21, 8);
+
+    var L = registerLandmark(p, g, { baseY: bh });
+    L.label = makeLabel(p, 12.1);
+    g.add(L.label);
+    return L;
+  }
+
   /* ---- 未登錄區：平整沙面（無沙丘）+ 圍籬 + 告示 + 建材堆 ---- */
   function buildUnmapped() {
     if (UNMAPPED.hidden) return;
@@ -698,6 +769,17 @@
       scene.add(g);
     }
 
+    /* 各地標可自訂淨空半徑；長形航母需要比一般建築更大的景觀留白。 */
+    function clearOfLandmarks(x, z, padding) {
+      for (var i = 0; i < PROJECTS.length; i++) {
+        var lp = PROJECTS[i].landmark;
+        if (!lp) continue;
+        var clearance = (lp.clearance || 10) + (padding || 0);
+        if (Math.hypot(x - lp.pos[0], z - lp.pos[1]) < clearance) return false;
+      }
+      return true;
+    }
+
     /* 樹木：分簇散佈（樹叢）+ 地形篩選（海拔帶 / 坡度 / 避開地標） */
     var rng = mulberry32(20260810);
     var umPos = (UNMAPPED && !UNMAPPED.hidden && UNMAPPED.pos) ? UNMAPPED.pos : null;
@@ -714,12 +796,7 @@
       var th = Terrain.ready() ? Terrain.height(px, pz) : 0;
       if (th < 0.4 || th > 4.6) continue;          /* 海拔帶：避開市區與山頂裸岩 */
       if (Math.abs(Terrain.ready() ? Terrain.height(px + 1.4, pz) - th : 0) > 0.4) continue;  /* 太陡不長 */
-      var far = true;
-      for (var i = 0; i < PROJECTS.length; i++) {
-        var lp = PROJECTS[i].landmark;
-        if (lp && Math.hypot(px - lp.pos[0], pz - lp.pos[1]) < 10) { far = false; break; }
-      }
-      if (!far) continue;
+      if (!clearOfLandmarks(px, pz, 0)) continue;
       if (umPos && Math.hypot(px - umPos[0], pz - umPos[1]) < 7) continue;
       tree(px, pz, 0.7 + rng() * 0.8, rng() * Math.PI);
       planted++; window.__treeCount++;
@@ -736,6 +813,7 @@
       if (Math.hypot(mx, mz) > 54) continue;
       var mh = Terrain.ready() ? Terrain.height(mx, mz) : 0;
       if (mh < 0.5 || mh > 5) continue;
+      if (!clearOfLandmarks(mx, mz, 1.5)) continue;
       var mg = new THREE.Group();
       mg.position.set(mx, mh, mz);
       mg.rotation.y = markRng() * Math.PI;
@@ -759,6 +837,7 @@
       var rh = Terrain.ready() ? Terrain.height(rx, rz) : 0;
       if (rh < 0.6 || rh > 7) continue;
       if (Math.abs(Terrain.ready() ? Terrain.height(rx + 1.4, rz) - rh : 0) > 0.5) continue;
+      if (!clearOfLandmarks(rx, rz, 1)) continue;
       var rg = new THREE.Group();
       rg.position.set(rx, rh, rz);
       rg.rotation.y = rockRng() * Math.PI;
@@ -805,11 +884,11 @@
       tg.add(tower, nacelle, rotor);
       scene.add(tg);
     }
-    /* 依高度圖沿東側高地疏列，約 1 km 間距，避開專案地標。 */
-    windTurbine(20, 29, 0.76, 0.10, 0.18, 0.34);
-    windTurbine(29, 20, 0.82, 0.04, 0.88, 0.31);
-    windTurbine(38, 26, 0.86, -0.08, 1.42, 0.36);
-    windTurbine(47, 23, 0.78, 0.06, 0.54, 0.32);
+    /* 航母佔用東側前景後，風機整組退到後方山脊，保留景深但不穿過船身。 */
+    windTurbine(18, 10, 0.76, 0.10, 0.18, 0.34);
+    windTurbine(30, 7, 0.82, 0.04, 0.88, 0.31);
+    windTurbine(42, 10, 0.86, -0.08, 1.42, 0.36);
+    windTurbine(53, 17, 0.78, 0.06, 0.54, 0.32);
   }
 
   /* ================= 互動：hover / 選取 ================= */
@@ -1242,6 +1321,7 @@
             if (!p.landmark) return;
             if (p.landmark.type === "collection-library") buildCollectionLibrary(p);
             else if (p.landmark.type === "signal-tower") buildSignalTower(p);
+            else if (p.landmark.type === "fleet-carrier") buildFleetCarrier(p);
           });
           buildFiller();
           reportBoot(96, "CALIBRATING VIEW");
