@@ -14,7 +14,7 @@
  *   status  LIVE / ACTIVE / IDLE（會決定狀態點的顏色）
  *   links   github / demo / 其他外連（沒有的欄位留空字串）
  *   landmark 地標設定：
- *     type   collection-library（收藏圖書館）| signal-tower（訊號塔）| fleet-carrier（艦隊航母）
+ *     type   collection-library（收藏圖書館）| signal-tower（訊號塔）| fleet-carrier（艦隊航母）| placeprint-display（地點相片卡展示台）
  *     pos    座標 [x, z]（以沙盤中心為原點，地面為 y=0）
  *     scale  縮放（預設 1）
  *     rotation Y 軸旋轉（弧度，預設 0）
@@ -79,6 +79,27 @@ window.PROJECTS = [
       scale: 0.7,
       rotation: -0.18,
       clearance: 12
+    }
+  },
+  {
+    id: "PRJ-004",
+    slug: "placeprint",
+    title: "Placeprint",
+    zh: "貼上 Google Maps 連結擷取地點資訊，搭配照片製作可調整版面的地點相片卡。",
+    desc: "Turn your photos and favorite places into shareable Placeprints.",
+    tags: ["TypeScript", "Vite", "GitHub Pages"],
+    year: "2026",
+    status: "LIVE",
+    links: {
+      github: "https://github.com/UnderLotus/Placeprint",
+      demo: "https://underlotus.github.io/Placeprint/"
+    },
+    landmark: {
+      type: "placeprint-display",
+      pos: [-50, 4],
+      scale: 0.7,
+      rotation: Math.PI / 6,
+      clearance: 14
     }
   }
 ];

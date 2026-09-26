@@ -654,6 +654,54 @@
     return L;
   }
 
+  /* ---- PRJ-004 地點相片卡展示台：立起白沙卡框 + 留白題字帶 + 地點標記 ---- */
+  function buildPlaceprintDisplay(p) {
+    var g = new THREE.Group();
+    var bh = Terrain.ready() ? Terrain.height(p.landmark.pos[0], p.landmark.pos[1]) : 0;
+    g.position.set(p.landmark.pos[0], bh, p.landmark.pos[1]);
+    g.rotation.y = p.landmark.rotation || 0;
+    g.scale.setScalar(p.landmark.scale || 1);
+
+    var mats = [
+      vxMat(0xD8DDD9),   /* 0 沙丘 */
+      vxMat(0xC3CAC6),   /* 1 展示台與相框 */
+      vxMat(0xDDE2DE),   /* 2 相片卡內頁 */
+      vxMat(0xEDF0ED),   /* 3 留白卡面 */
+      mkMat(0xD4B23E)    /* 4 小型地點標記 */
+    ];
+    var b = [];
+    function roundLayer(y, radius, matIdx) {
+      for (var row = -radius; row < radius; row++) {
+        var half = Math.floor(Math.sqrt(radius * radius - Math.pow(row + 0.5, 2)) + 0.5);
+        if (half > 0) b.push([-half, y, row, half * 2, 1, 1, matIdx]);
+      }
+    }
+    for (var layer = 0; layer < 5; layer++) roundLayer(layer, 11 - layer, 0);
+    roundLayer(5, 9, 1);                              /* 圓形白沙平台 */
+
+    /* 卡面由立體白方塊堆出；內頁保持素白，不使用照片貼圖。 */
+    b.push([-7, 6, -4, 14, 18, 1, 3]);             /* 連續留白卡面 */
+    b.push([-5, 11, -3, 10, 12, 1, 2]);            /* 無圖樣的相片留白窗 */
+    b.push([-7, 6, -2, 1, 18, 1, 1]);              /* 左框 */
+    b.push([6, 6, -2, 1, 18, 1, 1]);               /* 右框 */
+    b.push([-6, 6, -2, 12, 1, 1, 1]);              /* 下框 */
+    b.push([-6, 23, -2, 12, 1, 1, 1]);             /* 上框 */
+    b.push([-6, 10, -2, 12, 1, 1, 1]);             /* 相片區與空白題字帶分界 */
+    b.push([4, 8, -1, 1, 1, 1, 4]);                /* 題字帶中的地點標記 */
+    b.push([4, 9, -1, 1, 1, 1, 4]);
+
+    /* 後側支架讓相片卡成為立起的展示台，而非懸空立面。 */
+    b.push([-6, 6, -6, 1, 11, 2, 1]);
+    b.push([5, 6, -6, 1, 11, 2, 1]);
+    b.push([-5, 16, -6, 10, 1, 2, 1]);
+
+    g.add(voxelModel(b, mats));
+    var L = registerLandmark(p, g, { baseY: bh });
+    L.label = makeLabel(p, 17.2);
+    g.add(L.label);
+    return L;
+  }
+
   /* ---- 未登錄區：平整沙面（無沙丘）+ 圍籬 + 告示 + 建材堆 ---- */
   function buildUnmapped() {
     if (UNMAPPED.hidden) return;
@@ -1113,7 +1161,10 @@
     });
     var p = PROJECTS.find(function (x) { return x.id === id; });
     if (p && p.landmark) {
-      tweenAzimuthTo(Math.atan2(p.landmark.pos[0], p.landmark.pos[1]));
+      var focusAzimuth = id === "PRJ-004"
+        ? (isNarrow() ? -1.5 : (window.innerWidth <= 900 ? 0.4 : 0))
+        : Math.atan2(p.landmark.pos[0], p.landmark.pos[1]);
+      tweenAzimuthTo(focusAzimuth);
       spawnRipple(p.landmark.pos[0], p.landmark.pos[1]);   /* 標記脈衝：白沙漣漪 */
     }
   }
@@ -1227,7 +1278,7 @@
       camera.position.x = controls.target.x + Math.sin(a) * camTween.r;
       camera.position.z = controls.target.z + Math.cos(a) * camTween.r;
       if (k >= 1) camTween = null;
-    } else if (!RM && !DEBUG && nowMs - lastInteraction > 1200) {
+    } else if (!RM && !DEBUG && current !== "PRJ-004" && nowMs - lastInteraction > 1200) {
       /* 真正按秒計算的低速環繞；不受 24/30/60fps 或 Firefox rAF 節流影響。 */
       var idleAngle = dt * 0.022;
       var idleX = camera.position.x - controls.target.x;
@@ -1322,6 +1373,7 @@
             if (p.landmark.type === "collection-library") buildCollectionLibrary(p);
             else if (p.landmark.type === "signal-tower") buildSignalTower(p);
             else if (p.landmark.type === "fleet-carrier") buildFleetCarrier(p);
+            else if (p.landmark.type === "placeprint-display") buildPlaceprintDisplay(p);
           });
           buildFiller();
           reportBoot(96, "CALIBRATING VIEW");
